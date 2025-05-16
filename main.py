@@ -13,6 +13,10 @@ def webhook():
     bot.process_new_updates([update])
     return 'ok', 200
 
+@app.route('/', methods=['GET'])
+def index():
+    return 'Woofer bot is running 🐶', 200
+
 # Commands
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -21,13 +25,7 @@ def start_message(message):
 @bot.message_handler(commands=['help'])
 def help_message(message):
     bot.send_message(message.chat.id, "/start /help /ping /today /report")
-    @app.route('/', methods=['GET'])
-def index():
-    return 'Woofer bot is running 🐶', 200
-
 
 @bot.message_handler(commands=['ping'])
 def ping_message(message):
     bot.send_message(message.chat.id, "pong 🏓")
-
-# You can expand other handlers below...
