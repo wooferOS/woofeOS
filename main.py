@@ -60,4 +60,3 @@ def gpt_chat(message):
         bot.send_message(message.chat.id, reply)
     except Exception as e:
         bot.send_message(message.chat.id, "Щось пішло не так з GPT 😢")
-
