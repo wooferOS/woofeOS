@@ -1,0 +1,19 @@
+name: Set Telegram Webhook
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  set-webhook:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set Telegram Webhook
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_API_TOKEN }}/setWebhook" \
+          -d "url=https://woofer-bot.onrender.com/"
