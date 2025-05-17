@@ -1,68 +1,64 @@
 import os
 import telebot
-from flask import Flask, request
 import openai
+from flask import Flask, request
+import threading
 
-# Ініціалізація ключів
+# Змінні середовища
 BOT_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 bot = telebot.TeleBot(BOT_TOKEN)
-app = Flask(__name__)
 openai.api_key = OPENAI_API_KEY
+app = Flask(__name__)
 
-# Webhook endpoint
-@app.route('/', methods=['POST', 'GET'])
-def webhook():
-    if request.method == 'POST':
-        json_str = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_str)
-        bot.process_new_updates([update])
-        return 'ok', 200
-    return 'Woofer Webhook OK', 200
-
-# /start
-@bot.message_handler(commands=['start'])
-def start_handler(message):
-    bot.send_message(message.chat.id, "Привіт! Я Woofer Bot 🤖 Допоможу з TikTok, GPT і креативом для SMM!")
-
-# /help
-@bot.message_handler(commands=['help'])
-def help_handler(message):
-    commands = "/start — привітання\n/help — список команд\n/ping — перевірка\n/report — ідея від GPT\n(Напиши щось і я відповім)"
-    bot.send_message(message.chat.id, commands)
-
-# /ping
-@bot.message_handler(commands=['ping'])
-def ping_handler(message):
-    bot.send_message(message.chat.id, "pong 🏓")
-
-# /report — випадковий GPT-пост
-@bot.message_handler(commands=['report'])
-def report_handler(message):
-    try:
-        reply = get_gpt_response("Придумай щось цікаве або абсурдне для SMM TikTok про собак-кухарів")
-        bot.send_message(message.chat.id, reply)
-    except Exception:
-        bot.send_message(message.chat.id, "❌ Виникла помилка при зверненні до GPT")
-
-# GPT-відповіді на текст
-@bot.message_handler(func=lambda message: True)
-def gpt_response(message):
-    try:
-        reply = get_gpt_response(message.text)
-        bot.send_message(message.chat.id, reply)
-    except Exception:
-        bot.send_message(message.chat.id, "😢 Не вдалося отримати відповідь від GPT.")
-
-# GPT-логіка
-def get_gpt_response(prompt):
+# GPT-запит
+def get_gpt_reply(prompt):
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[{"role": "user", "content": prompt}],
-        timeout=10  # безпечний таймаут
+        timeout=10
     )
     return response.choices[0].message.content.strip()
 
-if __name__ == '__main__':
+# Вебхук
+@app.route('/', methods=['POST', 'GET'])
+def webhook():
+    if request.method == 'POST':
+        update = telebot.types.Update.de_json(request.data.decode("utf-8"))
+        threading.Thread(target=bot.process_new_updates, args=([update],)).start()
+        return 'OK', 200
+    return 'Woofer Webhook OK', 200
+
+# Команди
+@bot.message_handler(commands=['start'])
+def handle_start(message):
+    bot.send_message(message.chat.id, "Привіт! Я Woofer 🤖 Спробуй /help")
+
+@bot.message_handler(commands=['help'])
+def handle_help(message):
+    bot.send_message(message.chat.id, "/start /help /ping /report")
+
+@bot.message_handler(commands=['ping'])
+def handle_ping(message):
+    bot.send_message(message.chat.id, "pong 🏓")
+
+@bot.message_handler(commands=['report'])
+def handle_report(message):
+    try:
+        idea = get_gpt_reply("Придумай щось цікаве або абсурдне для TikTok про собак-кухарів")
+        bot.send_message(message.chat.id, idea)
+    except:
+        bot.send_message(message.chat.id, "GPT щось не відповів 😔")
+
+# GPT-чат
+@bot.message_handler(func=lambda m: True)
+def handle_message(message):
+    try:
+        reply = get_gpt_reply(message.text)
+        bot.send_message(message.chat.id, reply)
+    except:
+        bot.send_message(message.chat.id, "Щось пішло не так 😔")
+
+if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
