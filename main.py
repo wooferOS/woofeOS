@@ -86,8 +86,9 @@ def webhook():
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
         return '', 200
-    return 'Invalid content type', 403
+    else:
+        return 'Invalid content type', 403
 
-# Запуск сервера
+# Запуск Flask (для Render)
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
