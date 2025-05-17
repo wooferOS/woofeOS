@@ -60,7 +60,6 @@ def report_command(message):
         print("❌ GPT помилка:", e)
         print(traceback.format_exc())
         bot.send_message(message.chat.id, "GPT помилка 😢")
-
             ]
         )
         reply = response.choices[0].message['content']
