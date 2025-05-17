@@ -2,93 +2,80 @@ import os
 import telebot
 from flask import Flask, request
 import openai
+import traceback
+import requests
 
-# Ініціалізація токенів
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# ENV перемінні
+TOKEN = os.environ.get("TELEGRAM_API_TOKEN")
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
-if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
-    raise ValueError("❌ TELEGRAM_API_TOKEN або OPENAI_API_KEY не встановлено!")
-
-bot = telebot.TeleBot(TELEGRAM_TOKEN)
+bot = telebot.TeleBot(TOKEN, threaded=False)
 app = Flask(__name__)
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# Команда /start
+# Установити webhook автоматично
+def set_webhook():
+    webhook_url = "https://woofer-bot.onrender.com/"
+    res = requests.post(
+        f"https://api.telegram.org/bot{TOKEN}/setWebhook",
+        json={"url": webhook_url}
+    )
+    print(f"🔗 Webhook set: {res.status_code} - {res.text}")
+
+set_webhook()
+
+# ================= Команди ===================
 @bot.message_handler(commands=['start'])
-def start_command(message):
-    bot.send_message(
-        message.chat.id,
-        "Привіт! Я Woofer Bot — TikTok SMM помічник 🐶\n\n"
-        "Доступні команди:\n"
-        "/help /ping /report /today"
-    )
+def start_message(message):
+    bot.send_message(message.chat.id, "Привіт! Я Woofer Bot — TikTok SMM помічник 🐶")
 
-# Команда /help
 @bot.message_handler(commands=['help'])
-def help_command(message):
-    bot.send_message(
-        message.chat.id,
-        "/start /help /ping /report /today — Просто напиши щось, і я відповім!"
-    )
+def help_message(message):
+    bot.send_message(message.chat.id, "/start /help /ping /report /today — Просто напиши щось, і я відповім!")
 
-# Команда /ping
 @bot.message_handler(commands=['ping'])
-def ping_command(message):
+def ping_message(message):
     bot.send_message(message.chat.id, "Pong 🏓")
 
-# Команда /today
 @bot.message_handler(commands=['today'])
-def today_command(message):
-    bot.send_message(
-        message.chat.id,
-        "Сьогодні буде новий відео-рецепт для TikTok з песиками-кухарями! 🍔🐾"
-    )
+def today_message(message):
+    bot.send_message(message.chat.id, "Сьогодні буде новий відео-рецепт для TikTok з песиками-кухарями! 🍔🐾")
 
-# Команда /report — GPT-звіт
 @bot.message_handler(commands=['report'])
-def report_command(message):
+def report_message(message):
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[
-                {"role": "system", "content": "Ти SMM-менеджер TikTok."},
-                {"role": "user", "content": "Зроби короткий звіт за сьогоднішній TikTok контент з песиками-кухарями."}
-            ],
-            temperature=0.7
+                {"role": "system", "content": "Сформуй короткий звіт TikTok активності сьогодні."},
+                {"role": "user", "content": "Зроби звіт за сьогодні"},
+            ]
         )
-        result = response.choices[0].message.content.strip()
-        bot.send_message(message.chat.id, result)
+        reply = response.choices[0].message['content']
+        bot.send_message(message.chat.id, reply)
     except Exception as e:
-        bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
+        print("❌ GPT помилка:", e)
+        print(traceback.format_exc())
+        bot.send_message(message.chat.id, "GPT помилка 😢")
 
-# GPT-чат на всі інші повідомлення
+# Відповідь на будь-який інший текст
 @bot.message_handler(func=lambda message: True)
-def gpt_response(message):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "user", "content": message.text}
-            ],
-            temperature=0.7
-        )
-        result = response.choices[0].message.content.strip()
-        bot.send_message(message.chat.id, result)
-    except Exception as e:
-        bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
+def echo_message(message):
+    bot.send_message(message.chat.id, "Я тебе почув! 🐾")
 
-# Webhook (Render)
+# ================= Flask webhook ===================
 @app.route('/', methods=['POST'])
 def webhook():
-    if request.headers.get('content-type') == 'application/json':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return '', 200
-    else:
-        return 'Invalid content type', 403
+    json_string = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "OK", 200
 
-# Запуск Flask (для Render)
+@app.route('/', methods=['GET'])
+def index():
+    return "🐾 Woofer SMM бот працює!"
+
+# ================= Run local ===================
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
+    print("🚀 Woofer Bot запущено. Очікуємо запити Telegram...")
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
