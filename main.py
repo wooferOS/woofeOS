@@ -4,6 +4,8 @@ from flask import Flask, request
 import openai
 import traceback
 import requests
+import time
+from openai import OpenAI
 
 # Ініціалізація токенів
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
@@ -65,21 +67,37 @@ def report_command(message):
         bot.send_message(message.chat.id, "GPT помилка 😢")
 
 # GPT-чат на всі інші повідомлення
-@bot.message_handler(func=lambda message: True)
-def gpt_response(message):
+@bot.message_handler(commands=['report'])
+def report_command(message):
     try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "user", "content": message.text}
-            ],
-            temperature=0.7
+        thread = client.beta.threads.create()
+        client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content="Зроби короткий TikTok-звіт у стилі песика"
         )
-        result = response.choices[0].message.content.strip()
-        bot.send_message(message.chat.id, result)
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id="asst_SUNoeRmHMlwxXwIRNZYAjo43"
+        )
+
+        # Очікуємо завершення відповіді
+        while True:
+            status = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
+            if status.status == "completed":
+                break
+            elif status.status == "failed":
+                raise Exception("Асистент не зміг завершити відповідь.")
+            time.sleep(1)
+
+        # Отримуємо останнє повідомлення
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
+        reply = messages.data[0].content[0].text.value
+        bot.send_message(message.chat.id, reply)
+
     except Exception as e:
-        print("GPT помилка:", e)
-        print(traceback.format_exc())
+        print("❌ GPT помилка:", e)
+        traceback.print_exc()
         bot.send_message(message.chat.id, "GPT помилка 😢")
 
 # Webhook POST
