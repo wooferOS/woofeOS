@@ -41,7 +41,6 @@ def today_command(message):
         "Сьогодні буде новий відео-рецепт для TikTok з песиками-кухарями! 🍔🐾"
     )
 
-# Команда /report з OpenAI GPT-4
 @bot.message_handler(commands=['report'])
 def report_command(message):
     try:
@@ -52,6 +51,12 @@ def report_command(message):
                 {"role": "user", "content": "Зроби короткий звіт за сьогоднішній TikTok контент з песиками-кухарями."}
             ],
             temperature=0.7
+        )
+        result = response.choices[0].message.content.strip()
+        bot.send_message(message.chat.id, result)
+    except Exception as e:
+        bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
+
         )
         result = response.choices[0].message.content
         bot.send_message(message.chat.id, result)
