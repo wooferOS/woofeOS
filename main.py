@@ -1,64 +1,82 @@
-import os
+from flask import Flask, request
 import telebot
 import openai
-from flask import Flask, request
-import threading
+import logging
+import time
 
-# Змінні середовища
-BOT_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# 🔐 Ключі
+TOKEN = "7778803208:AAEe8SM8Fd7nbQ8H8AdJeLQjUqlnWAlW2K0"
+OPENAI_API_KEY = "🧠_GPT_KEY_СЮДИ_ДОДАЙ_В_ENV"
 
-bot = telebot.TeleBot(BOT_TOKEN)
-openai.api_key = OPENAI_API_KEY
+bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+openai.api_key = OPENAI_API_KEY
 
-# GPT-запит
-def get_gpt_reply(prompt):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        timeout=10
-    )
-    return response.choices[0].message.content.strip()
+# 🔧 Таймаут
+telebot.apihelper.READ_TIMEOUT = 5
+telebot.apihelper.CONNECT_TIMEOUT = 3
 
-# Вебхук
-@app.route('/', methods=['POST', 'GET'])
+# 📜 Логування
+logging.basicConfig(level=logging.INFO)
+
+@app.route("/", methods=["POST", "GET"])
 def webhook():
-    if request.method == 'POST':
-        update = telebot.types.Update.de_json(request.data.decode("utf-8"))
-        threading.Thread(target=bot.process_new_updates, args=([update],)).start()
-        return 'OK', 200
-    return 'Woofer Webhook OK', 200
+    if request.method == "POST":
+        update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
+        bot.process_new_updates([update])
+        return "ok", 200
+    return "👋 I'm alive", 200
 
-# Команди
-@bot.message_handler(commands=['start'])
+# 📍 /start
+@bot.message_handler(commands=["start"])
 def handle_start(message):
-    bot.send_message(message.chat.id, "Привіт! Я Woofer 🤖 Спробуй /help")
+    bot.send_message(message.chat.id, "👋 Привіт! Я Woofer SMM Bot — готовий допомогти з TikTok 🎬")
 
-@bot.message_handler(commands=['help'])
+# 🆘 /help
+@bot.message_handler(commands=["help"])
 def handle_help(message):
-    bot.send_message(message.chat.id, "/start /help /ping /report")
+    commands = "/start /help /ping /report /today"
+    bot.send_message(message.chat.id, f"🧩 Команди доступні:\n{commands}")
 
-@bot.message_handler(commands=['ping'])
+# 📶 /ping
+@bot.message_handler(commands=["ping"])
 def handle_ping(message):
-    bot.send_message(message.chat.id, "pong 🏓")
+    bot.send_message(message.chat.id, "🏓 pong")
 
-@bot.message_handler(commands=['report'])
+# 📊 /report
+@bot.message_handler(commands=["report"])
 def handle_report(message):
     try:
-        idea = get_gpt_reply("Придумай щось цікаве або абсурдне для TikTok про собак-кухарів")
-        bot.send_message(message.chat.id, idea)
-    except:
-        bot.send_message(message.chat.id, "GPT щось не відповів 😔")
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{
+                "role": "user",
+                "content": "Придумай абсурдну ідею для SMM TikTok із собаками-кухарями"
+            }],
+            timeout=10
+        )
+        text = response.choices[0].message.content.strip()
+        bot.send_message(message.chat.id, f"🐾 Ідея: {text}")
+    except Exception as e:
+        logging.error(f"GPT error: {e}")
+        bot.send_message(message.chat.id, "🚫 Помилка при зверненні до GPT")
 
-# GPT-чат
-@bot.message_handler(func=lambda m: True)
-def handle_message(message):
+# 💬 Загальні запити до GPT
+@bot.message_handler(func=lambda message: True)
+def handle_gpt_chat(message):
     try:
-        reply = get_gpt_reply(message.text)
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": message.text}],
+            timeout=10
+        )
+        reply = response.choices[0].message.content.strip()
         bot.send_message(message.chat.id, reply)
-    except:
-        bot.send_message(message.chat.id, "Щось пішло не так 😔")
+    except Exception as e:
+        logging.error(f"GPT error: {e}")
+        bot.send_message(message.chat.id, "⚠️ GPT не відповідає. Спробуй ще раз.")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+# 🧠 Примітка
+# Всі секрети зберігай у Render > Environment:
+# - TELEGRAM_API_TOKEN
+# - OPENAI_API_KEY
