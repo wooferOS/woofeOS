@@ -1,82 +1,85 @@
 from flask import Flask, request
 import telebot
 import openai
+import os
 import logging
-import time
 
-# 🔐 Ключі
-TOKEN = "7778803208:AAEe8SM8Fd7nbQ8H8AdJeLQjUqlnWAlW2K0"
-OPENAI_API_KEY = "🧠_GPT_KEY_СЮДИ_ДОДАЙ_В_ENV"
+# 🔐 Безпечне підключення до ключів
+TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
+bot = telebot.TeleBot(TELEGRAM_API_TOKEN)
 openai.api_key = OPENAI_API_KEY
+app = Flask(__name__)
 
-# 🔧 Таймаут
+# ⏱ Таймаути
 telebot.apihelper.READ_TIMEOUT = 5
 telebot.apihelper.CONNECT_TIMEOUT = 3
 
-# 📜 Логування
+# 🧾 Логування
 logging.basicConfig(level=logging.INFO)
 
-@app.route("/", methods=["POST", "GET"])
+@app.route("/", methods=["GET", "POST"])
 def webhook():
     if request.method == "POST":
         update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
         bot.process_new_updates([update])
         return "ok", 200
-    return "👋 I'm alive", 200
+    return "✅ Woofer bot is live", 200
 
-# 📍 /start
+# 🟢 /start
 @bot.message_handler(commands=["start"])
-def handle_start(message):
-    bot.send_message(message.chat.id, "👋 Привіт! Я Woofer SMM Bot — готовий допомогти з TikTok 🎬")
+def start_handler(message):
+    bot.send_message(message.chat.id, "🐶 Привіт! Я — Woofer SMM Bot. Готовий працювати над TikTok 🎬")
 
-# 🆘 /help
+# 🧠 /help
 @bot.message_handler(commands=["help"])
-def handle_help(message):
-    commands = "/start /help /ping /report /today"
-    bot.send_message(message.chat.id, f"🧩 Команди доступні:\n{commands}")
+def help_handler(message):
+    bot.send_message(message.chat.id,
+                     "🛠 Команди:\n"
+                     "/start — запуск\n"
+                     "/help — допомога\n"
+                     "/ping — перевірка\n"
+                     "/report — ідея для TikTok\n"
+                     "Напиши будь-що — я відповім як GPT 🧠")
 
-# 📶 /ping
+# 🛰 /ping
 @bot.message_handler(commands=["ping"])
-def handle_ping(message):
+def ping_handler(message):
     bot.send_message(message.chat.id, "🏓 pong")
 
-# 📊 /report
+# 🧪 /report
 @bot.message_handler(commands=["report"])
-def handle_report(message):
+def report_handler(message):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{
                 "role": "user",
-                "content": "Придумай абсурдну ідею для SMM TikTok із собаками-кухарями"
+                "content": "Придумай абсурдну ідею для TikTok з собаками-кухарями"
             }],
             timeout=10
         )
-        text = response.choices[0].message.content.strip()
-        bot.send_message(message.chat.id, f"🐾 Ідея: {text}")
+        reply = response.choices[0].message.content.strip()
+        bot.send_message(message.chat.id, f"🔥 Ідея для TikTok:\n{reply}")
     except Exception as e:
         logging.error(f"GPT error: {e}")
-        bot.send_message(message.chat.id, "🚫 Помилка при зверненні до GPT")
+        bot.send_message(message.chat.id, "🚫 Помилка генерації ідеї. GPT не відповів.")
 
-# 💬 Загальні запити до GPT
+# 💬 Відповідь GPT на будь-яке повідомлення
 @bot.message_handler(func=lambda message: True)
-def handle_gpt_chat(message):
+def gpt_chat_handler(message):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": message.text}],
+            messages=[{
+                "role": "user",
+                "content": message.text
+            }],
             timeout=10
         )
         reply = response.choices[0].message.content.strip()
         bot.send_message(message.chat.id, reply)
     except Exception as e:
         logging.error(f"GPT error: {e}")
-        bot.send_message(message.chat.id, "⚠️ GPT не відповідає. Спробуй ще раз.")
-
-# 🧠 Примітка
-# Всі секрети зберігай у Render > Environment:
-# - TELEGRAM_API_TOKEN
-# - OPENAI_API_KEY
+        bot.send_message(message.chat.id, "⚠️ Щось пішло не так. Спробуй пізніше.")
