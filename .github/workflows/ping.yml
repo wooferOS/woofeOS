@@ -1,0 +1,14 @@
+name: Keep Render Bot Awake
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"  # кожні 5 хвилин
+  workflow_dispatch:
+
+jobs:
+  ping-render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Curl ping to Render bot
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" https://woofer-bot.onrender.com/
