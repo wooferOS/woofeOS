@@ -3,22 +3,24 @@ import telebot
 import os
 import openai
 
-# Ініціалізація токенів
+# Ініціалізація токенів з оточення
 TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# GPT-клієнт
+# Встановлення ключа OpenAI
 openai.api_key = OPENAI_API_KEY
 
-@app.route('/', methods=['POST'])
+@app.route('/', methods=['GET', 'POST'])
 def webhook():
-    json_str = request.get_data().decode('utf-8')
-    update = telebot.types.Update.de_json(json_str)
-    bot.process_new_updates([update])
-    return 'ok', 200
+    if request.method == 'POST':
+        json_str = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_str)
+        bot.process_new_updates([update])
+        return 'ok', 200
+    return 'Woofer Bot is running', 200  # Відповідь для перевірки GET
 
 # /start
 @bot.message_handler(commands=['start'])
@@ -48,7 +50,7 @@ def report_message(message):
     except Exception as e:
         bot.send_message(message.chat.id, "Помилка при отриманні ідеї 😢")
 
-# Обробка звичайних повідомлень (GPT-чат)
+# GPT-чат для будь-якого тексту
 @bot.message_handler(func=lambda message: True)
 def gpt_chat(message):
     try:
