@@ -4,67 +4,66 @@ import os
 import openai
 import logging
 
-# Logging
+# Логування
 logging.basicConfig(level=logging.INFO)
 
-# Init Flask app and bot
-app = Flask(__name__)
-TOKEN = os.environ.get("TELEGRAM_API_TOKEN")
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+# Змінні середовища
+TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-bot = telebot.TeleBot(TOKEN, threaded=False)
+bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
 openai.api_key = OPENAI_API_KEY
 
-# Webhook endpoint
+# Вебхук
 @app.route('/', methods=['POST'])
 def webhook():
-    try:
-        update = telebot.types.Update.de_json(request.stream.read().decode("utf-8"))
-        bot.process_new_updates([update])
-    except Exception as e:
-        logging.error(f"Error in webhook: {e}")
-    return "ok", 200
+    json_str = request.get_data().decode('utf-8')
+    update = telebot.types.Update.de_json(json_str)
+    bot.process_new_updates([update])
+    return 'ok', 200
 
-# Commands
+# /start
 @bot.message_handler(commands=['start'])
-def start(message):
+def start_message(message):
     bot.send_message(message.chat.id, "Привіт! Я Woofer Bot — TikTok SMM помічник 🐶")
 
+# /help
 @bot.message_handler(commands=['help'])
-def help_command(message):
+def help_message(message):
     bot.send_message(message.chat.id, "/start /help /ping /report /today — Просто напиши щось, і я відповім!")
 
+# /ping
 @bot.message_handler(commands=['ping'])
-def ping(message):
+def ping_message(message):
     bot.send_message(message.chat.id, "pong 🏓")
 
+# /report
 @bot.message_handler(commands=['report'])
-def report(message):
+def report_message(message):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": "Придумай абсурдну ідею для TikTok з песиками-кухарями"}],
-            timeout=10  # OpenAI timeout
+            messages=[{"role": "user", "content": "Придумай щось смішне або абсурдне для TikTok з песиками-кухарями"}],
+            timeout=15  # таймаут
         )
-        bot.send_message(message.chat.id, response.choices[0].message.content)
+        reply = response.choices[0].message.content
+        bot.send_message(message.chat.id, reply)
     except Exception as e:
-        logging.error(f"GPT error: {e}")
+        logging.error(f"GPT помилка: {e}")
         bot.send_message(message.chat.id, "GPT помилка 😢")
 
-# Default GPT chat
-@bot.message_handler(func=lambda m: True)
+# Відповідь на будь-яке інше повідомлення
+@bot.message_handler(func=lambda message: True)
 def gpt_chat(message):
     try:
         response = openai.ChatCompletion.create(
             model="gpt-4",
             messages=[{"role": "user", "content": message.text}],
-            timeout=10
+            timeout=15
         )
-        bot.send_message(message.chat.id, response.choices[0].message.content)
+        reply = response.choices[0].message.content
+        bot.send_message(message.chat.id, reply)
     except Exception as e:
-        logging.error(f"GPT error: {e}")
-        bot.send_message(message.chat.id, "Помилка GPT 😓")
-
-# App entry for Gunicorn
-if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+        logging.error(f"GPT помилка: {e}")
+        bot.send_message(message.chat.id, "GPT помилка 😢")
