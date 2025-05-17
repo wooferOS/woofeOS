@@ -47,11 +47,20 @@ def today_command(message):
 @bot.message_handler(commands=['report'])
 def report_command(message):
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "Сформуй короткий звіт TikTok активності сьогодні."},
                 {"role": "user", "content": "Зроби звіт за сьогодні"},
+            ]
+        )
+        reply = response.choices[0].message.content
+        bot.send_message(message.chat.id, reply)
+    except Exception as e:
+        print("❌ GPT помилка:", e)
+        print(traceback.format_exc())
+        bot.send_message(message.chat.id, "GPT помилка 😢")
+
             ]
         )
         reply = response.choices[0].message['content']
