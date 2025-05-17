@@ -2,7 +2,6 @@ import os
 import telebot
 from flask import Flask, request
 import openai
-from threading import Thread
 
 # Ініціалізація токенів
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
@@ -63,7 +62,7 @@ def report_command(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
-# Інші повідомлення — GPT-чат
+# GPT-чат на всі інші повідомлення
 @bot.message_handler(func=lambda message: True)
 def gpt_response(message):
     try:
@@ -79,7 +78,7 @@ def gpt_response(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
-# Webhook (асинхронна обробка)
+# Webhook (Render)
 @app.route('/', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -87,9 +86,8 @@ def webhook():
         update = telebot.types.Update.de_json(json_string)
         bot.process_new_updates([update])
         return '', 200
-    else:
-        return 'Invalid content type', 403
+    return 'Invalid content type', 403
 
-# Запуск Flask (для Render)
+# Запуск сервера
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
