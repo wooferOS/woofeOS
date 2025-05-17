@@ -2,15 +2,16 @@ import os
 import telebot
 from flask import Flask, request
 import openai
+from threading import Thread
 
-# Ініціалізація
-TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+# Ініціалізація токенів
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not TOKEN or not OPENAI_API_KEY:
+if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
     raise ValueError("❌ TELEGRAM_API_TOKEN або OPENAI_API_KEY не встановлено!")
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot(TELEGRAM_TOKEN)
 app = Flask(__name__)
 client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
@@ -45,7 +46,7 @@ def today_command(message):
         "Сьогодні буде новий відео-рецепт для TikTok з песиками-кухарями! 🍔🐾"
     )
 
-# Команда /report — GPT звіт
+# Команда /report — GPT-звіт
 @bot.message_handler(commands=['report'])
 def report_command(message):
     try:
@@ -62,7 +63,7 @@ def report_command(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
-# Обробка інших повідомлень — GPT чат
+# Інші повідомлення — GPT-чат
 @bot.message_handler(func=lambda message: True)
 def gpt_response(message):
     try:
@@ -78,17 +79,17 @@ def gpt_response(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
-# Flask Webhook
+# Webhook (асинхронна обробка)
 @app.route('/', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
         json_string = request.get_data().decode('utf-8')
         update = telebot.types.Update.de_json(json_string)
-        bot.process_new_updates([update])
-        return '', 200
+        Thread(target=bot.process_new_updates, args=([update],)).start()
+        return 'ok', 200
     else:
         return 'Invalid content type', 403
 
-# Запуск сервера (локально або через Gunicorn)
+# Запуск Flask (для Render)
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
