@@ -12,7 +12,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not TELEGRAM_TOKEN or not OPENAI_API_KEY:
     raise ValueError("❌ TELEGRAM_API_TOKEN або OPENAI_API_KEY не встановлено!")
 
-openai.api_key = OPENAI_API_KEY
+openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_TOKEN, threaded=False)
 app = Flask(__name__)
 
@@ -30,7 +30,10 @@ set_webhook()
 # 📦 Команди
 @bot.message_handler(commands=['start'])
 def start_command(message):
-    bot.send_message(message.chat.id, "Привіт! Я Woofer Bot — TikTok SMM помічник 🐶\n\nДоступні команди:\n/help /ping /report /today")
+    bot.send_message(
+        message.chat.id,
+        "Привіт! Я Woofer Bot — TikTok SMM помічник 🐶\n\nДоступні команди:\n/help /ping /report /today"
+    )
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
@@ -47,22 +50,14 @@ def today_command(message):
 @bot.message_handler(commands=['report'])
 def report_command(message):
     try:
-        response = client.chat.completions.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": "Сформуй короткий звіт TikTok активності сьогодні."},
-                {"role": "user", "content": "Зроби звіт за сьогодні"},
+                {"role": "user", "content": "Зроби звіт за сьогодні"}
             ]
         )
-        reply = response.choices[0].message.content
-        bot.send_message(message.chat.id, reply)
-    except Exception as e:
-        print("❌ GPT помилка:", e)
-        print(traceback.format_exc())
-        bot.send_message(message.chat.id, "GPT помилка 😢")
-            ]
-        )
-        reply = response.choices[0].message['content']
+        reply = response.choices[0].message.content.strip()
         bot.send_message(message.chat.id, reply)
     except Exception as e:
         print("❌ GPT помилка:", e)
@@ -73,12 +68,14 @@ def report_command(message):
 @bot.message_handler(func=lambda message: True)
 def gpt_response(message):
     try:
-        response = openai.ChatCompletion.create(
+        response = openai_client.chat.completions.create(
             model="gpt-4",
-            messages=[{"role": "user", "content": message.text}],
+            messages=[
+                {"role": "user", "content": message.text}
+            ],
             temperature=0.7
         )
-        result = response.choices[0].message['content'].strip()
+        result = response.choices[0].message.content.strip()
         bot.send_message(message.chat.id, result)
     except Exception as e:
         print("GPT помилка:", e)
