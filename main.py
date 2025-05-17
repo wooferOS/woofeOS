@@ -5,10 +5,14 @@ import openai
 
 # Ініціалізація
 TOKEN = os.getenv("TELEGRAM_API_TOKEN")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not TOKEN or not OPENAI_API_KEY:
+    raise ValueError("❌ TELEGRAM_API_TOKEN або OPENAI_API_KEY не встановлено!")
+
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
-openai.api_key = os.getenv("OPENAI_API_KEY")
-client = openai.OpenAI()
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 # Команда /start
 @bot.message_handler(commands=['start'])
@@ -41,6 +45,7 @@ def today_command(message):
         "Сьогодні буде новий відео-рецепт для TikTok з песиками-кухарями! 🍔🐾"
     )
 
+# Команда /report — GPT звіт
 @bot.message_handler(commands=['report'])
 def report_command(message):
     try:
@@ -57,19 +62,23 @@ def report_command(message):
     except Exception as e:
         bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
+# Обробка інших повідомлень — GPT чат
+@bot.message_handler(func=lambda message: True)
+def gpt_response(message):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4",
+            messages=[
+                {"role": "user", "content": message.text}
+            ],
+            temperature=0.7
         )
-        result = response.choices[0].message.content
+        result = response.choices[0].message.content.strip()
         bot.send_message(message.chat.id, result)
     except Exception as e:
-        print("GPT помилка:", e)
-        bot.send_message(message.chat.id, "GPT помилка 😢")
+        bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
 
-# Обробка інших повідомлень
-@bot.message_handler(func=lambda message: True)
-def default_response(message):
-    bot.send_message(message.chat.id, "Просто введи команду або скажи щось!")
-
-# Flask маршрут для Webhook
+# Flask Webhook
 @app.route('/', methods=['POST'])
 def webhook():
     if request.headers.get('content-type') == 'application/json':
@@ -80,21 +89,6 @@ def webhook():
     else:
         return 'Invalid content type', 403
 
-# Запуск сервера
+# Запуск сервера (локально або через Gunicorn)
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 10000)))
-@bot.message_handler(commands=['report'])
-def report_command(message):
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Ти SMM-менеджер TikTok."},
-                {"role": "user", "content": "Зроби короткий звіт за сьогоднішній TikTok контент з песиками-кухарями."}
-            ],
-            temperature=0.7
-        )
-        result = response.choices[0].message.content.strip()
-        bot.send_message(message.chat.id, result)
-    except Exception as e:
-        bot.send_message(message.chat.id, f"GPT помилка 😢\n{e}")
